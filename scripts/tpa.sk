@@ -1,0 +1,125 @@
+options:
+    tpa_prefix: &8[&bTPA&8]&r
+    tpa_timeout_seconds: 120
+
+function tpaSetRequest(from: player, target: player):
+    set {tpa.req::%uuid of {_target}%::from} to name of {_from}
+    set {tpa.req::%uuid of {_target}%::targetName} to name of {_target}
+    set {tpa.req::%uuid of {_target}%::ts} to now
+
+function tpaClearRequest(target: player):
+    delete {tpa.req::%uuid of {_target}%::from}
+    delete {tpa.req::%uuid of {_target}%::targetName}
+    delete {tpa.req::%uuid of {_target}%::ts}
+
+function tpaRequesterNameOf(target: player) :: text:
+    if {tpa.req::%uuid of {_target}%::from} is not set:
+        return ""
+    return {tpa.req::%uuid of {_target}%::from}
+
+command /tpa [<player>]:
+    trigger:
+        if arg-1 is not set:
+            send "{@tpa_prefix} &7Usage: &f/tpa <joueur>" to player
+            stop
+
+        if arg-1 is player:
+            send "{@tpa_prefix} &cTu ne peux pas te teleporter a toi-meme." to player
+            stop
+
+        tpaSetRequest(player, arg-1)
+        send "{@tpa_prefix} &aDemande envoyee a &f%arg-1%&a." to player
+        send "{@tpa_prefix} &f%player% &7souhaite se teleporter a toi." to arg-1
+        send "{@tpa_prefix} &7Utilise &f/tpaccept &7ou &f/tpdeny&7." to arg-1
+
+command /tpaccept [<text>]:
+    aliases: tpyes
+    trigger:
+        set {_requesterName} to tpaRequesterNameOf(player)
+        set {_requester} to {_requesterName} parsed as player
+        if {_requester} is not set:
+            send "{@tpa_prefix} &cAucune demande en attente." to player
+            stop
+
+        tpaClearRequest(player)
+        teleport {_requester} to player
+        send "{@tpa_prefix} &aDemande acceptee." to player
+        send "{@tpa_prefix} &a%player% a accepte ta demande." to {_requester}
+
+command /tpdeny [<text>]:
+    aliases: tpno
+    trigger:
+        set {_requesterName} to tpaRequesterNameOf(player)
+        set {_requester} to {_requesterName} parsed as player
+        if {_requester} is not set:
+            send "{@tpa_prefix} &cAucune demande en attente." to player
+            stop
+
+        tpaClearRequest(player)
+        send "{@tpa_prefix} &cDemande refusee." to player
+        send "{@tpa_prefix} &c%player% a refuse ta demande." to {_requester}
+
+command /tpacancel [<player>]:
+    trigger:
+        if arg-1 is set:
+            if {tpa.req::%uuid of arg-1%::from} is name of player:
+                tpaClearRequest(arg-1)
+                send "{@tpa_prefix} &cDemande annulee pour &f%arg-1%&c." to player
+                send "{@tpa_prefix} &c%player% a annule sa demande." to arg-1
+            else:
+                send "{@tpa_prefix} &cTu n'as pas de demande en attente vers ce joueur." to player
+            stop
+
+        set {_cancelled} to 0
+        loop {tpa.req::*}:
+            if loop-index ends with "::from":
+                if loop-value is name of player:
+                    set {_uuid} to loop-index
+                    replace all "::from" with "" in {_uuid}
+                    delete {tpa.req::%{_uuid}%::from}
+                    delete {tpa.req::%{_uuid}%::targetName}
+                    delete {tpa.req::%{_uuid}%::ts}
+                    add 1 to {_cancelled}
+        if {_cancelled} > 0:
+            send "{@tpa_prefix} &c%{_cancelled}% demande(s) annulee(s)." to player
+        else:
+            send "{@tpa_prefix} &cAucune demande a annuler." to player
+
+every 10 seconds:
+    loop {tpa.req::*}:
+        if loop-index ends with "::ts":
+            set {_ts} to loop-value
+            if difference between now and {_ts} > {@tpa_timeout_seconds} seconds:
+                set {_uuid} to loop-index
+                replace all "::ts" with "" in {_uuid}
+
+                set {_targetName} to {tpa.req::%{_uuid}%::targetName}
+                if {_targetName} is not set:
+                    set {_target} to {_uuid} parsed as player
+                    if {_target} is set:
+                        set {_targetName} to name of {_target}
+
+                set {_requesterName} to {tpa.req::%{_uuid}%::from}
+                set {_targetP} to {_targetName} parsed as player
+                set {_requesterP} to {_requesterName} parsed as player
+
+                delete {tpa.req::%{_uuid}%::from}
+                delete {tpa.req::%{_uuid}%::targetName}
+                delete {tpa.req::%{_uuid}%::ts}
+
+                if {_targetP} is set:
+                    send "{@tpa_prefix} &cLa demande de teleportation a expire." to {_targetP}
+                if {_requesterP} is set:
+                    send "{@tpa_prefix} &cTa demande vers &f%{_targetName}% &ca expire." to {_requesterP}
+
+on quit:
+    tpaClearRequest(player)
+    loop {tpa.req::*}:
+        if loop-index ends with "::from":
+            if loop-value is name of player:
+                set {_uuid} to loop-index
+                replace all "::from" with "" in {_uuid}
+                delete {tpa.req::%{_uuid}%::from}
+                delete {tpa.req::%{_uuid}%::targetName}
+                delete {tpa.req::%{_uuid}%::ts}
+

@@ -1,0 +1,68 @@
+options:
+    ci_prefix: &6[ClearInv] &r
+    ci_playerdata_path: world/players/data
+
+# ============================================================
+#  Helpers
+# ============================================================
+
+function ciClearOnline(p: player):
+    clear inventory of {_p}
+    set helmet of {_p} to air
+    set chestplate of {_p} to air
+    set leggings of {_p} to air
+    set boots of {_p} to air
+    set off hand of {_p} to air
+
+# Clear l'inventaire d'un joueur offline en editant son fichier NBT.
+# Renvoie true si succes, false sinon.
+function ciClearOffline(uuid: text) :: boolean:
+    set {_path} to "{@ci_playerdata_path}/%{_uuid}%.dat"
+    set {_nbt} to nbt compound of file {_path}
+    if {_nbt} is not set:
+        return false
+
+    # Vider l'inventaire principal (hotbar + sac)
+    delete tag "Inventory" of {_nbt}
+    # Vider l'armure + offhand (MC 1.21+ stocke ca dans "equipment")
+    delete tag "equipment" of {_nbt}
+    # Vider l'enderchest (commenter cette ligne si tu veux le garder)
+    # delete tag "EnderItems" of {_nbt}
+
+    save nbt file of {_nbt}
+    return true
+
+# ============================================================
+#  Command
+# ============================================================
+
+command /clearinv [<offline player>]:
+    aliases: /ci, /clearinventory
+    permission: clearinv.use
+    permission message: {@ci_prefix}&cTu n'as pas la permission.
+    trigger:
+        if arg-1 is not set:
+            if player is not set:
+                send "{@ci_prefix}&cUsage: &e/clearinv <pseudo>"
+                stop
+            ciClearOnline(player)
+            send "{@ci_prefix}&aTon inventaire a ete vide."
+            stop
+
+        set {_target} to arg-1
+        set {_uuid} to "%uuid of {_target}%"
+        set {_name} to "%name of {_target}%"
+
+        if {_target} is online:
+            ciClearOnline({_target})
+            send "{@ci_prefix}&aInventaire de &e%{_name}% &avide."
+            send "{@ci_prefix}&cTon inventaire a ete vide par un staff." to {_target}
+            stop
+
+        # Offline -> edit direct du fichier NBT
+        set {_ok} to ciClearOffline({_uuid})
+        if {_ok} is true:
+            send "{@ci_prefix}&aInventaire de &e%{_name}% &7(&8%{_uuid}%&7) &avide &8(fichier NBT)."
+            send "{@ci_prefix}&7%player% a vide l'inventaire de &e%{_name}% &8(offline)." to console
+        else:
+            send "{@ci_prefix}&cFichier NBT introuvable pour &e%{_name}%&c. Le joueur n'a peut-etre jamais joue ici."

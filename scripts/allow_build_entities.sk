@@ -1,0 +1,195 @@
+# Crea: keep mob structures buildable, but prevent boss/golem spawns.
+# Goal: players can finish the structure and keep it as a build.
+
+function isSoulBlock(loc: location) :: boolean:
+    if block at {_loc} is soul sand:
+        return true
+    if block at {_loc} is soul soil:
+        return true
+    return false
+
+function isSnowGolemPattern(headLoc: location) :: boolean:
+    set {_b1} to {_headLoc} ~ vector(0, -1, 0)
+    set {_b2} to {_headLoc} ~ vector(0, -2, 0)
+    if block at {_b1} is snow block:
+        if block at {_b2} is snow block:
+            return true
+    return false
+
+function isIronGolemPattern(headLoc: location) :: boolean:
+    set {_mid} to {_headLoc} ~ vector(0, -1, 0)
+    set {_bot} to {_headLoc} ~ vector(0, -2, 0)
+    if block at {_mid} is iron block:
+        if block at {_bot} is iron block:
+            set {_l} to {_headLoc} ~ vector(-1, -1, 0)
+            set {_r} to {_headLoc} ~ vector(1, -1, 0)
+            set {_f} to {_headLoc} ~ vector(0, -1, 1)
+            set {_bk} to {_headLoc} ~ vector(0, -1, -1)
+            if block at {_l} is iron block:
+                if block at {_r} is iron block:
+                    return true
+            if block at {_f} is iron block:
+                if block at {_bk} is iron block:
+                    return true
+    return false
+
+function isCopperBuildBlock(loc: location) :: boolean:
+    set {_typeName} to lowercase "%type of block at {_loc}%"
+    if {_typeName} contains "copper_golem_statue":
+        return false
+    if {_typeName} contains "copper golem statue":
+        return false
+    if {_typeName} contains "copper":
+        if {_typeName} contains "block":
+            return true
+        if {_typeName} ends with " copper":
+            return true
+        if {_typeName} ends with "_copper":
+            return true
+    return false
+
+function isCopperGolemPattern(headLoc: location) :: boolean:
+    # Same T-shape as iron golem, but with copper blocks.
+    set {_mid} to {_headLoc} ~ vector(0, -1, 0)
+    set {_bot} to {_headLoc} ~ vector(0, -2, 0)
+    if isCopperBuildBlock({_mid}) is true:
+        if isCopperBuildBlock({_bot}) is true:
+            set {_l} to {_headLoc} ~ vector(-1, -1, 0)
+            set {_r} to {_headLoc} ~ vector(1, -1, 0)
+            set {_f} to {_headLoc} ~ vector(0, -1, 1)
+            set {_bk} to {_headLoc} ~ vector(0, -1, -1)
+            if isCopperBuildBlock({_l}) is true:
+                if isCopperBuildBlock({_r}) is true:
+                    return true
+            if isCopperBuildBlock({_f}) is true:
+                if isCopperBuildBlock({_bk}) is true:
+                    return true
+    return false
+
+function isWitherPattern(headLoc: location) :: boolean:
+    set {_lsk} to {_headLoc} ~ vector(-1, 0, 0)
+    set {_rsk} to {_headLoc} ~ vector(1, 0, 0)
+    set {_fsk} to {_headLoc} ~ vector(0, 0, 1)
+    set {_bsk} to {_headLoc} ~ vector(0, 0, -1)
+
+    # X-axis: skull skull skull (headLoc in the middle)
+    if block at {_lsk} is wither skeleton skull:
+        if block at {_rsk} is wither skeleton skull:
+            set {_c1} to {_headLoc} ~ vector(0, -1, 0)
+            set {_c2} to {_headLoc} ~ vector(0, -2, 0)
+            set {_s1} to {_headLoc} ~ vector(-1, -1, 0)
+            set {_s2} to {_headLoc} ~ vector(1, -1, 0)
+            if isSoulBlock({_c1}) is true:
+                if isSoulBlock({_c2}) is true:
+                    if isSoulBlock({_s1}) is true:
+                        if isSoulBlock({_s2}) is true:
+                            return true
+
+    # Z-axis: skull skull skull (headLoc in the middle)
+    if block at {_fsk} is wither skeleton skull:
+        if block at {_bsk} is wither skeleton skull:
+            set {_c1} to {_headLoc} ~ vector(0, -1, 0)
+            set {_c2} to {_headLoc} ~ vector(0, -2, 0)
+            set {_s1} to {_headLoc} ~ vector(0, -1, 1)
+            set {_s2} to {_headLoc} ~ vector(0, -1, -1)
+            if isSoulBlock({_c1}) is true:
+                if isSoulBlock({_c2}) is true:
+                    if isSoulBlock({_s1}) is true:
+                        if isSoulBlock({_s2}) is true:
+                            return true
+
+    return false
+
+function keepPlacedFinalBlock(loc: location, mat: itemtype):
+    # Place manually after cancel so the structure remains complete.
+    wait 1 tick
+    set block at {_loc} to {_mat}
+
+function isAxeTool(p: player) :: boolean:
+    set {_toolName} to lowercase "%type of tool of {_p}%"
+    if {_toolName} contains "pickaxe":
+        return false
+    if {_toolName} ends with "axe":
+        return true
+    return false
+
+function isCopperGolemStatueBlock(loc: location) :: boolean:
+    set {_blockType} to lowercase "%type of block at {_loc}%"
+    if {_blockType} contains "copper_golem_statue":
+        return true
+    if {_blockType} contains "copper golem statue":
+        return true
+    return false
+
+function isCopperGolemStatueEntity(ent: entity) :: boolean:
+    set {_entityType} to lowercase "%type of {_ent}%"
+    if {_entityType} contains "copper_golem_statue":
+        return true
+    if {_entityType} contains "copper golem statue":
+        return true
+    return false
+
+function isCopperGolemEntity(ent: entity) :: boolean:
+    set {_etype} to lowercase "%type of {_ent}%"
+    if {_etype} contains "copper_golem":
+        return true
+    if {_etype} contains "copper golem":
+        return true
+    return false
+
+on place of carved pumpkin:
+    if world of player is "crea":
+        set {_head} to location of event-block
+
+        if isCopperGolemPattern({_head}) is true:
+            cancel event
+            keepPlacedFinalBlock({_head}, carved pumpkin)
+            stop
+
+        if isSnowGolemPattern({_head}) is true:
+            cancel event
+            keepPlacedFinalBlock({_head}, carved pumpkin)
+            stop
+
+        if isIronGolemPattern({_head}) is true:
+            cancel event
+            keepPlacedFinalBlock({_head}, carved pumpkin)
+            stop
+
+on place of wither skeleton skull:
+    if world of player is "crea":
+        set {_head} to location of event-block
+        if isWitherPattern({_head}) is true:
+            cancel event
+            keepPlacedFinalBlock({_head}, wither skeleton skull)
+            stop
+
+# Failsafe: if another plugin still spawns one, block it in crea.
+on spawn of wither:
+    if world of event-entity is "crea":
+        cancel event
+
+on spawn of iron golem:
+    if world of event-entity is "crea":
+        cancel event
+
+on spawn of snowman:
+    if world of event-entity is "crea":
+        cancel event
+
+on spawn:
+    if world of event-entity is "crea":
+        if isCopperGolemEntity(event-entity) is true:
+            cancel event
+
+# Block axe right-click on copper golem statues so they cannot transform back to entities.
+on right click:
+    if world of player is "crea":
+        if isAxeTool(player) is true:
+            if clicked block is set:
+                if isCopperGolemStatueBlock(location of clicked block) is true:
+                    cancel event
+                    stop
+            if clicked entity is set:
+                if isCopperGolemStatueEntity(clicked entity) is true:
+                    cancel event
