@@ -1,2 +1,0 @@
-on zzzinvalidevento:
-    send "test" to player
